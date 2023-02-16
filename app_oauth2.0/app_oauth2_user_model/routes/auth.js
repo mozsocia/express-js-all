@@ -14,7 +14,10 @@ const oauth2Client = new google.auth.OAuth2(
 router.get('/google', (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    scope: ['https://www.googleapis.com/auth/userinfo.email']
+    scope: [
+      'email',
+      'profile'
+  ]
   });
   res.redirect(url);
 });
@@ -28,7 +31,7 @@ router.get('/google/callback', async (req, res) => {
 
   let user = await User.findOne({ email });
   if (!user) {
-    user = new User({ email });
+    user = new User({ email, name: data.name });
     await user.save();
   }
 
