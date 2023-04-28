@@ -1,4 +1,5 @@
 const Todo = require('../models/todo');
+const { validationResult, body } = require('express-validator');
 
 exports.getAllTodos = async (req, res) => {
 
@@ -26,6 +27,28 @@ exports.getTodoById = async (req, res) => {
 };
 
 exports.createTodo = async (req, res) => {
+
+
+  const validationRules = [
+
+    body('title')
+      .notEmpty().withMessage('title is required'),
+    body('description')
+      .notEmpty().withMessage('description is required').bail()
+      .isLength({ min: 20 }).withMessage('description must be at least 20 characters')
+  ];
+
+  // Run validation
+  await Promise.all(validationRules.map((validationRule) => validationRule.run(req)));
+
+  // Check for validation errors
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
+
+
+
   try {
     const { title, description } = req.body;
     const todo = new Todo({
@@ -37,6 +60,8 @@ exports.createTodo = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+
+  res.json({ "msg": "success" })
 };
 
 exports.updateTodo = async (req, res) => {
