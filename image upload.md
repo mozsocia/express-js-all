@@ -1,5 +1,4 @@
 ```js
-// app.js
 const express = require('express');
 const fileUpload = require('express-fileupload');
 const app = express();
@@ -11,6 +10,18 @@ app.use(express.json());
 app.use(fileUpload());
 app.use('/uploads', express.static('uploads'));
 
+mongoose
+.connect("mongodb://0.0.0.0:27017/", {
+  dbName: "imageupload",
+})
+.then(() => {
+  console.log('mongodb connected.')
+})
+.catch((err) => console.log(err.message))
+
+mongoose.connection.on('connected', () => {
+console.log('Mongoose connected to db')
+})
 
 
 // Configure API routes
@@ -23,7 +34,6 @@ app.listen(PORT, () => {
 ```
 
 ```js
-
 // routes/imageRoutes.js
 const express = require('express');
 const imageController = require('../controllers/imageController');
@@ -32,6 +42,8 @@ const router = express.Router();
 
 // Route for uploading an image
 router.post('/upload', imageController.uploadImage);
+router.post('/upload/:id', imageController.updateUploadImage);
+
 
 module.exports = router;
 ```
@@ -43,7 +55,13 @@ module.exports = router;
 const fs = require('fs');
 const path = require('path');
 
-function uploadImage(req, fieldName) {
+function ensureFolderExists(folderPath) {
+  if (!fs.existsSync(folderPath)) {
+    fs.mkdirSync(folderPath, { recursive: true });
+  }
+}
+
+function uploadImage(req, fieldName, folderName = 'public') {
   return new Promise((resolve, reject) => {
 
     if (!req.files || !req.files[fieldName]) {
@@ -51,45 +69,144 @@ function uploadImage(req, fieldName) {
     }
 
     const imageFile = req.files[fieldName];
-    const uploadPath = path.join(__dirname, '../uploads', `${Date.now()}_${imageFile.name}`);
+    const uploadFolderPath = path.join(__dirname, '../uploads', folderName);
+    ensureFolderExists(uploadFolderPath);
+
+    const uploadPath = path.join(uploadFolderPath, `${Date.now()}_${imageFile.name}`);
 
     imageFile.mv(uploadPath, (err) => {
       if (err) {
         return reject('Failed to upload file.');
       }
 
-      resolve(`/uploads/${path.basename(uploadPath)}`);
+      resolve(`/uploads/${folderName}/${path.basename(uploadPath)}`);
     });
   });
 }
 
+function updateUploadImage(req, fieldName,  previousImagePath ,folderName = 'public') {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Upload new image
+      const newImagePath = await uploadImage(req, fieldName, folderName);
+
+      // Delete previous image
+      if (previousImagePath) {
+        const previousImagePathFull = path.join(__dirname, '../', previousImagePath);
+        if (fs.existsSync(previousImagePathFull)) {
+          fs.unlinkSync(previousImagePathFull);
+        }
+      }
+
+      resolve(newImagePath);
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+
+
+
 module.exports = {
   uploadImage,
+  updateUploadImage
 };
+
 
 ```
 ```js
+// models/imageModel.js
+
+const mongoose = require('mongoose');
+
+const imageSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+  },
+  description: {
+    type: String,
+  },
+  uploadPath: {
+    type: String,
+    required: true,
+  },
+});
+
+const Image = mongoose.model('Image', imageSchema);
+
+module.exports = Image;
+
+```
+
+
+```js
 // controllers/imageController.js
 
-const fs = require('fs');
-const path = require('path');
-
-const { uploadImage } = require('../helpers/ImageUploadHelper'); // Import the helper module
+const { uploadImage , updateUploadImage} = require('../helpers/ImageUploadHelper');
+const Image = require('../models/imageModel'); // Import the Mongoose model
 
 // Handle image upload
-exports.uploadImage =async (req, res) => {
+exports.uploadImage = async (req, res) => {
   try {
     const { name, description } = req.body;
-
+ 
     const uploadPath = await uploadImage(req, 'image');
 
-    // Now, you can save the image details in your database (e.g., MongoDB)
-    // Save the image details in your database here
+    // Save the image details in your database
+    const image = new Image({
+      name,
+      description,
+      uploadPath,
+    });
 
-    res.json({ name, description, uploadPath });
+    const savedImage = await image.save();
+
+    res.json(savedImage);
   } catch (error) {
-    console.log(error)
+    console.log(error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+
+
+// Handle image update with upload
+exports.updateUploadImage = async (req, res) => {
+  try {
+    const { name, description } = req.body;
+
+    // Fetch the existing image details
+    const existingImage = await Image.findById(req.params.id);
+    if (!existingImage) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+
+    // Get the previous image path
+    const previousImagePath = existingImage.uploadPath;
+
+    // Check if the 'image' field exists in req.files
+    const uploadPath = req.files && req.files.image
+      ? await updateUploadImage(req, 'image',  previousImagePath)
+      : previousImagePath;
+
+    // Update the image details in your database
+    const updatedImage = await Image.findByIdAndUpdate(
+      req.params.id,
+      {
+        name,
+        description,
+        uploadPath,
+      },
+      { new: true }
+    );
+
+    res.json(updatedImage);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 ```
