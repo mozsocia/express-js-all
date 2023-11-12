@@ -42,10 +42,13 @@ const router = express.Router();
 
 // Route for uploading an image
 router.post('/upload', imageController.uploadImage);
-router.post('/upload/:id', imageController.updateUploadImage);
+router.put('/upload/:id', imageController.updateUploadImage);
+router.delete('/upload/:id', imageController.deleteUploadImage);
+
 
 
 module.exports = router;
+
 ```
 
 
@@ -105,13 +108,21 @@ function updateUploadImage(req, fieldName,  previousImagePath ,folderName = 'pub
   });
 }
 
+function deleteImage (imagePath) {
+  let image_path = path.join(__dirname, '../', imagePath)
+  if (fs.existsSync(image_path)) {
+    fs.unlinkSync(image_path);
+  }
+}
 
 
 
 module.exports = {
   uploadImage,
-  updateUploadImage
+  updateUploadImage,
+  deleteImage
 };
+
 
 
 ```
@@ -144,14 +155,14 @@ module.exports = Image;
 ```js
 // controllers/imageController.js
 
-const { uploadImage , updateUploadImage} = require('../helpers/ImageUploadHelper');
+const { uploadImage, updateUploadImage, deleteImage } = require('../helpers/ImageUploadHelper');
 const Image = require('../models/imageModel'); // Import the Mongoose model
 
 // Handle image upload
 exports.uploadImage = async (req, res) => {
   try {
     const { name, description } = req.body;
- 
+
     const uploadPath = await uploadImage(req, 'image');
 
     // Save the image details in your database
@@ -175,8 +186,6 @@ exports.uploadImage = async (req, res) => {
 // Handle image update with upload
 exports.updateUploadImage = async (req, res) => {
   try {
-    const { name, description } = req.body;
-
     // Fetch the existing image details
     const existingImage = await Image.findById(req.params.id);
     if (!existingImage) {
@@ -188,21 +197,37 @@ exports.updateUploadImage = async (req, res) => {
 
     // Check if the 'image' field exists in req.files
     const uploadPath = req.files && req.files.image
-      ? await updateUploadImage(req, 'image',  previousImagePath)
+      ? await updateUploadImage(req, 'image', previousImagePath)
       : previousImagePath;
 
-    // Update the image details in your database
-    const updatedImage = await Image.findByIdAndUpdate(
-      req.params.id,
-      {
-        name,
-        description,
-        uploadPath,
-      },
-      { new: true }
-    );
+
+    const updatedImage = await existingImage.set({
+      ...req.body,
+      uploadPath,
+    }).save();
 
     res.json(updatedImage);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+
+
+exports.deleteUploadImage = async (req, res) => {
+  try {
+    // Fetch the existing image details
+    const existingImage = await Image.findByIdAndRemove(req.params.id);
+    if (!existingImage) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+
+    // Get the previous image path
+    await deleteImage(existingImage.uploadPath);
+
+
+    res.json({ message: 'Image deleted Successful' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
