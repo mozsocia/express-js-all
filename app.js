@@ -20,10 +20,7 @@ async function validateInput(rules, input) {
     let errors = {};
 
     if (error) {
-        error.details.forEach((err) => {
-            errors[err.path[0]] = err.message;
-        });
-        console.log(errors)
+        error.details.forEach((err) => errors[err.path[0]] = err.message);
     }
 
     return { error, value, errors }
@@ -33,36 +30,27 @@ async function validateInput(rules, input) {
 userRules = {
     username: Joi.string().alphanum().min(3).max(30).required(),
     email: Joi.string().email().required(),
-    password: Joi.string().regex(/^[a-zA-Z0-9]{3,30}$/).required()
+    password: Joi.string().regex(/^[a-zA-Z0-9]{3,30}$/).required().messages({
+        'string.pattern.base': 'Password must contain only letters and numbers and be between 3 and 30 characters long.'
+    })
 }
 
 
 app.get('/', (req, res) => {
-    const userInput = {
-        username: '',
-        email: '',
-        password: '',
-    };
-
-    res.render('index', { userInput, errors: {} });
+    res.render('index');
 });
 
 app.post('/', async (req, res) => {
-    const userInput = {
-        username: req.body.username,
-        email: req.body.email,
-        password: req.body.password,
-    };
 
-    const { error, value, errors } = await validateInput(userRules, userInput);
-
-
+    const { error, value, errors } = await validateInput(userRules, req.body);
 
     if (error) {
-        res.render('index', { value, errors });
-    } else {
-        res.render('success', { userInput });
+        return res.render('index', { value, errors });
     }
+
+    return res.render('success', { value });
+
+
 });
 
 app.listen(3000, () => {
