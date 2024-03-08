@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width"/>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"/>
+    <title>
+      Success
+    </title>
+  </head>
+  <body>
+    <div class="container mt-2">
+      <header>
+        <h2>Success</h2>
+        <p>
+          You have successfully submitted the form!
+        </p>
+      </header>
+      <section>
+        <h2>Your Input</h2>
+        <ul>
+          <li>Username:
+            {{ userInput.username }}</li>
+          <li>Email:
+            {{ userInput.email }}</li>
+          <li>Password:
+            {{ userInput.password }}</li>
+        </ul>
+      </section>
+    </div>
+  </body>
+</html>

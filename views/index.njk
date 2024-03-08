@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validation Example</title>
+  </head>
+  <body>
+    <form action="/" method="post">
+      <label for="username">Username:</label>
+      <input type="text" id="username" name="username" value="{{ value.username }}">
+      {% if errors.username %}
+        <p style="color: red;">{{ errors.username }}</p>
+      {% endif %}
+
+      <label for="email">Email:</label>
+      <input type="text" id="email" name="email" value="{{ value.email }}">
+      {% if errors.email %}
+        <p style="color: red;">{{ errors.email }}</p>
+      {% endif %}
+
+      <label for="password">Password:</label>
+      <input type="password" id="password" name="password" value="{{ value.password }}">
+      {% if errors.password %}
+        <p style="color: red;">{{ errors.password }}</p>
+      {% endif %}
+
+      <button type="submit">Submit</button>
+    </form>
+  </body>
+</html>
